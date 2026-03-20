@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
-import { ToolType, Point } from '../types';
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { Canvas, PencilBrush, FabricImage, Control, Point } from 'fabric';
+import { ToolType } from '../types';
 
 interface CanvasBoardProps {
   activeTool: ToolType;
@@ -13,150 +14,157 @@ export interface CanvasHandle {
   injectImage: (imageData: string) => void;
 }
 
-const CanvasBoard = forwardRef<CanvasHandle, CanvasBoardProps>(({ activeTool, strokeColor, strokeWidth }, ref) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const lastPos = useRef<Point | null>(null);
+// Pre-render delete icon
+const DELETE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="11" fill="#ef4444"/>
+  <line x1="8" y1="8" x2="16" y2="16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="16" y1="8" x2="8" y2="16" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+</svg>`;
+const deleteImg = new Image();
+deleteImg.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(DELETE_SVG)}`;
 
-  useImperativeHandle(ref, () => ({
-    getCanvasImage: () => {
-      if (!canvasRef.current) return null;
-      // Return base64 string without the data:image/png;base64, prefix for API
-      return canvasRef.current.toDataURL('image/png').split(',')[1];
-    },
-    clearCanvas: () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    },
-    injectImage: (imageData: string) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+function renderDeleteIcon(
+  ctx: CanvasRenderingContext2D,
+  left: number,
+  top: number,
+) {
+  const size = 24;
+  ctx.save();
+  ctx.translate(left, top);
+  ctx.drawImage(deleteImg, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
 
-      const img = new Image();
-      img.onload = () => {
-        // Center the image or place it nicely
-        // For PoC, we define a fixed size or proportional
-        const scale = Math.min(canvas.width / img.width, canvas.height / img.height) * 0.8;
-        const w = img.width * scale;
-        const h = img.height * scale;
-        const x = (canvas.width - w) / 2;
-        const y = (canvas.height - h) / 2;
-        
-        ctx.shadowColor = "rgba(0,0,0,0.2)";
-        ctx.shadowBlur = 20;
-        ctx.drawImage(img, x, y, w, h);
-        ctx.shadowBlur = 0; // Reset
-      };
-      // Handle both raw base64 (from AI) and Data URLs (from file upload)
-      img.src = imageData.startsWith('data:') 
-        ? imageData 
-        : `data:image/png;base64,${imageData}`;
-    }
-  }));
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      // Initialize canvas size
-      const resizeCanvas = () => {
-        const parent = canvas.parentElement;
-        if (parent) {
-          canvas.width = parent.clientWidth;
-          canvas.height = parent.clientHeight;
-          
-          // Fill white background initially
-          const ctx = canvas.getContext('2d');
-          if(ctx) {
-             ctx.fillStyle = '#ffffff';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-        }
-      };
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
-      return () => window.removeEventListener('resize', resizeCanvas);
-    }
-  }, []);
-
-  const getCoordinates = (event: React.MouseEvent | React.TouchEvent): Point | null => {
-    if (!canvasRef.current) return null;
-    const rect = canvasRef.current.getBoundingClientRect();
-    let clientX, clientY;
-
-    if ('touches' in event) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      clientX = (event as React.MouseEvent).clientX;
-      clientY = (event as React.MouseEvent).clientY;
-    }
-
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
-    };
-  };
-
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling on touch
-    const pos = getCoordinates(e);
-    if (pos) {
-      setIsDrawing(true);
-      lastPos.current = pos;
-    }
-  };
-
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !lastPos.current || !canvasRef.current) return;
-    e.preventDefault();
-    
-    const pos = getCoordinates(e);
-    if (!pos) return;
-
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(pos.x, pos.y);
-    
-    ctx.strokeStyle = activeTool === 'eraser' ? '#ffffff' : strokeColor;
-    ctx.lineWidth = activeTool === 'eraser' ? strokeWidth * 2 : strokeWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    
-    ctx.stroke();
-
-    lastPos.current = pos;
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    lastPos.current = null;
-  };
-
-  return (
-    <div className="w-full h-full relative bg-white shadow-inner rounded-xl overflow-hidden touch-none cursor-crosshair">
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-        className="block w-full h-full"
-      />
-    </div>
-  );
+const deleteControl = new Control({
+  x: 0.5,
+  y: -0.5,
+  offsetX: 8,
+  offsetY: -8,
+  cursorStyle: 'pointer',
+  mouseUpHandler: (_e, transform) => {
+    const target = transform.target;
+    target.canvas?.remove(target);
+    target.canvas?.requestRenderAll();
+    return true;
+  },
+  render: renderDeleteIcon,
 });
 
-CanvasBoard.displayName = "CanvasBoard";
+const CanvasBoard = forwardRef<CanvasHandle, CanvasBoardProps>(
+  ({ activeTool, strokeColor, strokeWidth }, ref) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const canvasElRef = useRef<HTMLCanvasElement>(null);
+    const fabricRef = useRef<Canvas | null>(null);
+
+    // Initialize Fabric canvas once
+    useEffect(() => {
+      if (!canvasElRef.current || !containerRef.current) return;
+      const container = containerRef.current;
+
+      const fc = new Canvas(canvasElRef.current, {
+        backgroundColor: '#ffffff',
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
+
+      fc.freeDrawingBrush = new PencilBrush(fc);
+
+      // Zoom with mouse wheel
+      fc.on('mouse:wheel', (opt) => {
+        const delta = opt.e.deltaY;
+        let zoom = fc.getZoom();
+        zoom *= 0.999 ** delta;
+        zoom = Math.min(Math.max(zoom, 0.2), 10);
+        fc.zoomToPoint(new Point(opt.e.offsetX, opt.e.offsetY), zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+      });
+
+      fabricRef.current = fc;
+
+      const handleResize = () => {
+        fc.setDimensions({
+          width: container.clientWidth,
+          height: container.clientHeight,
+        });
+        fc.renderAll();
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        fc.dispose();
+        fabricRef.current = null;
+      };
+    }, []);
+
+    // Sync tool mode
+    useEffect(() => {
+      const fc = fabricRef.current;
+      if (!fc) return;
+
+      if (activeTool === 'pen') {
+        fc.isDrawingMode = true;
+        fc.selection = false;
+        const brush = fc.freeDrawingBrush as PencilBrush;
+        brush.color = strokeColor;
+        brush.width = strokeWidth;
+      } else {
+        // select mode — drag objects
+        fc.isDrawingMode = false;
+        fc.selection = true;
+      }
+    }, [activeTool, strokeColor, strokeWidth]);
+
+    useImperativeHandle(ref, () => ({
+      getCanvasImage: () => {
+        const fc = fabricRef.current;
+        if (!fc) return null;
+        return fc.toDataURL({ format: 'png', multiplier: 1 }).split(',')[1];
+      },
+      clearCanvas: () => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        fc.clear();
+        fc.backgroundColor = '#ffffff';
+        fc.renderAll();
+      },
+      injectImage: (imageData: string) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+
+        const src = imageData.startsWith('data:')
+          ? imageData
+          : `data:image/png;base64,${imageData}`;
+
+        FabricImage.fromURL(src).then((img) => {
+          const scale = Math.min(
+            (fc.getWidth() * 0.7) / (img.width ?? 1),
+            (fc.getHeight() * 0.7) / (img.height ?? 1),
+          );
+          img.scale(scale);
+          img.set({
+            left: (fc.getWidth() - (img.width ?? 0) * scale) / 2,
+            top: (fc.getHeight() - (img.height ?? 0) * scale) / 2,
+            selectable: true,
+            hasControls: true,
+          });
+          // Attach delete control
+          img.controls = { ...img.controls, deleteControl };
+          fc.add(img);
+          fc.setActiveObject(img);
+          fc.renderAll();
+        });
+      },
+    }));
+
+    return (
+      <div ref={containerRef} className="w-full h-full bg-white touch-none">
+        <canvas ref={canvasElRef} />
+      </div>
+    );
+  },
+);
+
+CanvasBoard.displayName = 'CanvasBoard';
 export default CanvasBoard;
