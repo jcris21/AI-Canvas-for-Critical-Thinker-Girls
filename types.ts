@@ -17,7 +17,7 @@ export interface Point {
   y: number;
 }
 
-export type ToolType = 'pen' | 'eraser';
+export type ToolType = 'pen' | 'select';
 
 export interface DrawLine {
   tool: ToolType;
