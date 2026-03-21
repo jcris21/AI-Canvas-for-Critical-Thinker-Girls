@@ -1,51 +1,83 @@
-import google.generativeai as genai
+"""Gemini integration — supports GEMINI_API_KEY (local) and Vertex AI (production)."""
+import base64
+
+from fastapi import HTTPException, status
+from google import genai
+from google.genai import types
+
 from app.core.config import settings
-from app.modules.ai.schemas import HistoryMessage
 
-genai.configure(api_key=settings.gemini_api_key)
-
-SYSTEM_INSTRUCTION = """
-Eres WonderBot, una tutora socrática amigable y curiosa para niñas de ~11 años.
-Tu objetivo es desarrollar el pensamiento crítico mediante preguntas abiertas.
-
-Reglas:
-1. Tono: alegre, curioso, seguro y motivador. Usa emojis ocasionalmente 🌟.
-2. Interacción:
-   - Cuando el usuario dibuja algo, reconócelo con entusiasmo.
-   - Haz preguntas abiertas ("¿Por qué crees que...?", "¿Qué pasaría si...?").
-   - No solo identifiques el objeto; conéctalo a un concepto más profundo.
-3. Nunca des respuestas directas — guía con preguntas.
-4. Responde siempre en español.
-5. Mantén respuestas cortas y conversacionales.
-"""
+SOCRATIC_SYSTEM_INSTRUCTION = """
+Eres WonderBot, una tutora socrática amigable para niñas de ~11 años.
+Responde SIEMPRE en español. Usa el método socrático: guía con preguntas abiertas,
+nunca des la respuesta directamente. Sé alentadora, usa emojis ocasionalmente.
+""".strip()
 
 
-async def chat_with_gemini(
-    message: str,
-    history: list[HistoryMessage] | None = None,
-    canvas_image_base64: str | None = None,
-) -> str:
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=SYSTEM_INSTRUCTION,
-    )
+class AIService:
+    def __init__(self) -> None:
+        if settings.GEMINI_API_KEY:
+            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        else:
+            self.client = genai.Client(
+                vertexai=True,
+                project=settings.VERTEX_PROJECT,
+                location=settings.VERTEX_LOCATION,
+            )
 
-    # Build contents from history
-    contents = []
-    for h in (history or []):
-        contents.append({"role": h.role, "parts": [{"text": h.text}]})
+    async def chat(
+        self,
+        history: list[dict],
+        new_message: str,
+        canvas_image_base64: str | None = None,
+        system_instruction: str | None = None,
+    ) -> str:
+        # Convert history to Gemini Content objects
+        # History dicts use "content" key (from DB) or "text" key (from frontend)
+        contents = [
+            types.Content(
+                role=msg["role"],
+                parts=[types.Part(text=msg.get("content") or msg.get("text", ""))],
+            )
+            for msg in history
+        ]
 
-    # Build current user parts
-    user_parts: list = [{"text": message}]
-    if canvas_image_base64:
-        user_parts.append({
-            "inline_data": {
-                "mime_type": "image/png",
-                "data": canvas_image_base64,
-            }
-        })
+        # Build current message parts (text + optional canvas image)
+        parts: list[types.Part] = [types.Part(text=new_message)]
+        if canvas_image_base64:
+            img_data = canvas_image_base64
+            if "," in img_data:
+                img_data = img_data.split(",", 1)[1]
+            parts.append(
+                types.Part(
+                    inline_data=types.Blob(
+                        mime_type="image/png",
+                        data=base64.b64decode(img_data),
+                    )
+                )
+            )
 
-    contents.append({"role": "user", "parts": user_parts})
+        contents.append(types.Content(role="user", parts=parts))
 
-    response = await model.generate_content_async(contents)
-    return response.text
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction or SOCRATIC_SYSTEM_INSTRUCTION,
+                    temperature=0.7,
+                ),
+            )
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI service is temporarily unavailable. Please try again later.",
+            )
+
+        reply = response.text
+        if not reply:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI service returned an empty response. Please try again later.",
+            )
+        return reply

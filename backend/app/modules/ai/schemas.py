@@ -1,18 +1,20 @@
-from pydantic import BaseModel
+from typing import Literal
+
+from app.schemas.common import BaseSchema
 
 
-class HistoryMessage(BaseModel):
-    role: str  # "user" | "model"
+class HistoryMessage(BaseSchema):
+    role: Literal["user", "model"]
     text: str
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(BaseSchema):
     session_id: str
     message: str
     history: list[HistoryMessage] = []
     canvas_image_base64: str | None = None
+    system_instruction: str | None = None
 
 
-class ChatResponse(BaseModel):
+class ChatResponse(BaseSchema):
     reply: str
-    session_id: str
