@@ -14,6 +14,11 @@ export interface CanvasHandle {
   injectImage: (imageData: string) => void;
 }
 
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 10;
+const IMAGE_SCALE_FACTOR = 0.7;
+const DELETE_CONTROL_OFFSET = 8;
+
 // Pre-render delete icon
 const DELETE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
   <circle cx="12" cy="12" r="11" fill="#ef4444"/>
@@ -38,8 +43,8 @@ function renderDeleteIcon(
 const deleteControl = new Control({
   x: 0.5,
   y: -0.5,
-  offsetX: 8,
-  offsetY: -8,
+  offsetX: DELETE_CONTROL_OFFSET,
+  offsetY: -DELETE_CONTROL_OFFSET,
   cursorStyle: 'pointer',
   mouseUpHandler: (_e, transform) => {
     const target = transform.target;
@@ -74,7 +79,7 @@ const CanvasBoard = forwardRef<CanvasHandle, CanvasBoardProps>(
         const delta = opt.e.deltaY;
         let zoom = fc.getZoom();
         zoom *= 0.999 ** delta;
-        zoom = Math.min(Math.max(zoom, 0.2), 10);
+        zoom = Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM);
         fc.zoomToPoint(new Point(opt.e.offsetX, opt.e.offsetY), zoom);
         opt.e.preventDefault();
         opt.e.stopPropagation();
@@ -139,8 +144,8 @@ const CanvasBoard = forwardRef<CanvasHandle, CanvasBoardProps>(
 
         FabricImage.fromURL(src).then((img) => {
           const scale = Math.min(
-            (fc.getWidth() * 0.7) / (img.width ?? 1),
-            (fc.getHeight() * 0.7) / (img.height ?? 1),
+            (fc.getWidth() * IMAGE_SCALE_FACTOR) / (img.width ?? 1),
+            (fc.getHeight() * IMAGE_SCALE_FACTOR) / (img.height ?? 1),
           );
           img.scale(scale);
           img.set({
@@ -154,6 +159,8 @@ const CanvasBoard = forwardRef<CanvasHandle, CanvasBoardProps>(
           fc.add(img);
           fc.setActiveObject(img);
           fc.renderAll();
+        }).catch((err) => {
+          console.error('Failed to load image onto canvas:', err);
         });
       },
     }));

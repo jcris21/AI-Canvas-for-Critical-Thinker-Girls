@@ -27,6 +27,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   interimResults: boolean;
   start(): void;
   stop(): void;
+  abort(): void;
   onresult: ((e: SpeechRecognitionEvent) => void) | null;
   onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
@@ -63,6 +64,14 @@ const App: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
 
   const sendMessage = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? inputText).trim();
@@ -118,9 +127,41 @@ const App: React.FC = () => {
     sendMessage('¿Qué ves en mi dibujo? ¿Qué te hace pensar?');
   };
 
+  const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: '⚠️ Formato no compatible. Por favor sube una imagen JPEG, PNG, WebP o GIF.',
+          sender: Sender.System,
+          timestamp: Date.now(),
+        },
+      ]);
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: '⚠️ La imagen es demasiado grande. El tamaño máximo permitido es 5 MB.',
+          sender: Sender.System,
+          timestamp: Date.now(),
+        },
+      ]);
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;

@@ -6,9 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **WonderCanvas AI** is an educational web application for children (targeting ~11-year-old girls) that combines an interactive drawing canvas with an AI-powered Socratic tutor ("WonderBot"). The AI uses Google Gemini to engage users through open-ended questions and contextual learning. UI strings are primarily in Spanish.
 
+## Repository Structure
+
+```
+frontend/   # React/Vite frontend app
+```
+
 ## Commands
 
+Run from the `frontend/` directory:
+
 ```bash
+cd frontend
 npm install        # Install dependencies
 npm run dev        # Start dev server at http://localhost:3000
 npm run build      # Production build
@@ -19,7 +28,7 @@ No linting or testing scripts are configured yet.
 
 ## Environment Variables
 
-Create a `.env.local` file with:
+Create a `frontend/.env.local` file with:
 ```
 GEMINI_API_KEY=your_key_here
 ```
@@ -38,12 +47,12 @@ Vite exposes this as both `process.env.API_KEY` and `process.env.GEMINI_API_KEY`
 
 ### Component Responsibilities
 
-- **`App.tsx`**: Layout, all state (messages, active tool, stroke color), orchestrates canvas ↔ AI interaction
-- **`components/CanvasBoard.tsx`**: HTML5 Canvas with mouse/touch support; exposes imperative API via `useImperativeHandle`:
+- **`frontend/App.tsx`**: Layout, all state (messages, active tool, stroke color), orchestrates canvas ↔ AI interaction
+- **`frontend/components/CanvasBoard.tsx`**: HTML5 Canvas with mouse/touch support; exposes imperative API via `useImperativeHandle`:
   - `getCanvasImage()` → base64 string (no prefix)
   - `clearCanvas()` → resets to white
   - `injectImage(base64)` → overlays image with shadow effect
-- **`services/geminiService.ts`**: Gemini 2.5 Flash integration with Socratic system instruction; handles function-calling for illustration generation
+- **`frontend/services/geminiService.ts`**: Gemini 2.5 Flash integration with Socratic system instruction; handles function-calling for illustration generation
 
 ### AI Integration
 
@@ -57,4 +66,4 @@ Tailwind CSS is loaded via CDN in `index.html` (not installed as a package). Bra
 
 ### Module Resolution
 
-Libraries (React, React DOM, Lucide, `@google/genai`) are loaded via importmap in `index.html`, not bundled. Path alias `@/` maps to the root directory.
+Libraries (React, React DOM, Lucide, `@google/genai`) are loaded via importmap in `frontend/index.html`, not bundled. Path alias `@/` maps to the `frontend/` directory.
