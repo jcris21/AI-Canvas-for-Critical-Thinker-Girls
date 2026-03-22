@@ -380,6 +380,7 @@ const App: React.FC = () => {
 
               {/* Send button */}
               <button
+                title="Enviar"
                 onClick={() => sendMessage()}
                 disabled={isProcessing}
                 className="p-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

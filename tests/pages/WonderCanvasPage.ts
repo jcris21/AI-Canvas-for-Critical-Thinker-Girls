@@ -4,7 +4,7 @@ import path from 'path';
 const AI_CHAT_URL = '**/api/v1/ai/chat';
 
 export const MOCK_AI_REPLY = '¡Qué interesante! ¿Por qué crees eso?';
-export const ERROR_FALLBACK_TEXT = 'Ups, tuve un problema pensando. ¿Intentamos de nuevo?';
+export const ERROR_FALLBACK_TEXT = '¡Oh no! Me desconcentré un poco. ¿Puedes repetirlo?';
 
 export class WonderCanvasPage {
   readonly page: Page;
@@ -34,17 +34,17 @@ export class WonderCanvasPage {
     this.uploadButton = page.locator('button[title="Cargar imagen"]');
     this.fileInput = page.locator('input[type="file"]');
 
-    this.canvas = page.locator('canvas').first();
+    this.canvas = page.locator('canvas[data-fabric="top"]');
     this.analyzeButton = page.getByRole('button', { name: 'Mira esto' });
 
     this.chatInput = page.locator('textarea[placeholder="Pregunta algo o dibuja..."]');
-    this.sendButton = page.locator('div:has(textarea) button:last-child');
+    this.sendButton = page.locator('button[title="Enviar"]');
     this.messagesContainer = page.locator('.no-scrollbar');
   }
 
   async goto() {
     await this.page.goto('/');
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
     await expect(this.canvas).toBeVisible();
   }
 
