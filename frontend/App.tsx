@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import CanvasBoard, { CanvasHandle } from './components/CanvasBoard';
+import CanvasBoard, { CanvasHandle } from './components/screens/CanvasBoard';
 import { chatWithGemini } from './services/geminiService';
 import { Message, Sender, ToolType } from './types';
 import {
@@ -89,10 +89,10 @@ const App: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const history = messages.map(m => ({
-        role: m.sender === Sender.AI ? 'model' : 'user',
-        text: m.text,
-      }));
+      const history = messages
+        .filter(m => m.sender === Sender.User || m.sender === Sender.AI)
+        .map(m => ({ role: m.sender as 'user' | 'model', text: m.text }))
+        .filter((_, i, arr) => !(i === 0 && arr[0].role === 'model'));
 
       const imageBase64 = canvasRef.current?.getCanvasImage();
 
@@ -380,6 +380,7 @@ const App: React.FC = () => {
 
               {/* Send button */}
               <button
+                title="Enviar"
                 onClick={() => sendMessage()}
                 disabled={isProcessing}
                 className="p-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

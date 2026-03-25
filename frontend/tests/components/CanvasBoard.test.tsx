@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act } from '@testing-library/react';
-import CanvasBoard, { type CanvasHandle } from '../../components/CanvasBoard';
+import CanvasBoard, { type CanvasHandle } from '../../components/screens/CanvasBoard';
 
 // ---------------------------------------------------------------------------
 // Hoist fabric mock BEFORE any imports resolve.

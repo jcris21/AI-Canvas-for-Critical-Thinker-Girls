@@ -6,20 +6,20 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
-if not settings.DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set. Cannot start application without a database connection.")
+_engine = None
+_AsyncSessionLocal = None
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.APP_ENV == "development",
-    pool_pre_ping=True,
-)
-
-AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
-    engine,
-    expire_on_commit=False,
-    class_=AsyncSession,
-)
+if settings.DATABASE_URL:
+    _engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.APP_ENV == "development",
+        pool_pre_ping=True,
+    )
+    _AsyncSessionLocal = async_sessionmaker(
+        _engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
 
 
 class Base(DeclarativeBase):
@@ -27,7 +27,9 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+    if _AsyncSessionLocal is None:
+        raise RuntimeError("DATABASE_URL is not set. This route requires a database connection.")
+    async with _AsyncSessionLocal() as session:
         try:
             yield session
             await session.commit()

@@ -397,3 +397,6 @@ The system is built around:
     Celery o Dramatiq más adelante para background jobs
 
     PostgreSQL (Neon ahora, migrable después)
+
+  3. DB
+  Neon Postgres

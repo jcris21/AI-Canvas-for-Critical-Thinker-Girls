@@ -14,6 +14,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_critical_env_vars(self) -> "Settings":
+        if self.APP_ENV == "development":
+            return self
         missing = []
         if self.DATABASE_URL == "":
             missing.append("DATABASE_URL")

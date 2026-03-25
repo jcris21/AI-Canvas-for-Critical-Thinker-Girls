@@ -23,7 +23,7 @@ test.describe('WonderBot Chat', () => {
     await wc.sendButton.click();
 
     await expect(
-      wc.page.locator('.bg-pink-500.text-white').last(),
+      wc.messagesContainer.locator('.rounded-tr-none').last(),
     ).toContainText(userMessage);
   });
 
@@ -47,7 +47,7 @@ test.describe('WonderBot Chat', () => {
     await wc.sendChatMessageViaEnter(msg);
 
     await expect(
-      wc.page.locator('.bg-pink-500.text-white').last(),
+      wc.messagesContainer.locator('.rounded-tr-none').last(),
     ).toContainText(msg);
   });
 
