@@ -68,10 +68,12 @@ class AIService:
                     temperature=0.7,
                 ),
             )
-        except Exception:
+        except HTTPException:
+            raise
+        except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="AI service is temporarily unavailable. Please try again later.",
+                detail=f"AI service error: {exc}",
             )
 
         reply = response.text
